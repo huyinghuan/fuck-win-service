@@ -1,6 +1,6 @@
 {
   "name": "fuck-win-service",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Base on nssm.exe Regiter windows service by bat",
   "author": "huyinghuan",
   "homepage": "https://github.com/huyinghuan/fuck-win-service",
