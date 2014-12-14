@@ -72,6 +72,12 @@ register.bat
 new winser(opion)
 
 ```
+##sample
+
+见 sample文件嘉
+
+## Test
+仅在xp 32位 虚拟机下测试过。身边没有window机器了。
 
 ##BUG
 
