@@ -1,17 +1,12 @@
 (function() {
-  var $async, $exec, $fs, $path, Nssm;
-
-  $async = require('async');
+  var $fs, $path, Nssm;
 
   $path = require('path');
-
-  $exec = require('child_process').exec;
 
   $fs = require('fs');
 
 
   /*
-  
     option    [optional]
       name: "Service Name"
       exec: "Absolute Path to exec" #最好是绝对路径
@@ -26,6 +21,8 @@
       this.initNssmLocation();
       this.initAppPackage();
       this.initExecLocation();
+      this.initService();
+      this.buildInstallBat();
     }
 
     Nssm.prototype.initAppPackage = function() {
@@ -40,8 +37,7 @@
     Nssm.prototype.initNssmLocation = function() {
       var nssmExec;
       nssmExec = this.checkArch("32") ? "nssm.exe" : "nssm64.exe";
-      this.nssmLocation = $path.join(__dirname, 'bin', nssmExec);
-      return console.log(this.nssmLocation);
+      return this.nssmLocation = $path.join(__dirname, 'bin', nssmExec);
     };
 
     Nssm.prototype.initExecLocation = function() {
@@ -51,8 +47,19 @@
       }
       nodeExce = this.checkArch("32") ? "node.exe" : "node64.exe";
       defExecLocation = $path.join(process.cwd(), nodeExce);
-      this.execLocation = defExecLocation;
-      return console.log(this.execLocation);
+      return this.execLocation = defExecLocation;
+    };
+
+    Nssm.prototype.initService = function() {
+      var main;
+      this.service = {};
+      this.service.name = this.option.name || this.appPackage.name || 'node';
+      main = this.option.main || this.appPackage.main || '';
+      main = $path.join(process.cwd(), main);
+      if (this.option.arg) {
+        main = "" + main + " " + this.option.arg;
+      }
+      return this.service.command = "" + this.execLocation + " " + main;
     };
 
     Nssm.prototype.checkArch = function(arch) {
@@ -61,81 +68,53 @@
       return systemArch === arch;
     };
 
-    Nssm.prototype.checkIsWindowPlatForm = function() {
-      if (process.platform !== 'win32') {
-        return false;
-      }
-      return true;
+    Nssm.prototype.buildInstallBat = function() {
+      var queue;
+      this.buildUninstallBat();
+      this.buildRestartBat();
+      this.buildStartBat();
+      this.buildStopBat();
+      queue = ["" + this.nssmLocation + " install " + this.service.name + " " + this.service.command, "" + this.nssmLocation + " start " + this.service.name];
+      return this.writeBat('register.bat', queue);
     };
 
-    Nssm.prototype.nssmExec = function(operate, serviceName, command, cb) {
-      var cmd, self;
-      self = this;
-      cmd = "" + this.nssmLocation + " " + operate + " " + command;
-      return $exec(cmd, function(err, stdout, stderr) {
-        if (stderr) {
-          !self.option.silent && console.error(stderr);
+    Nssm.prototype.buildUninstallBat = function() {
+      var queue;
+      queue = ["" + this.nssmLocation + " stop " + this.service.name, "" + this.nssmLocation + " remove " + this.service.name];
+      return this.writeBat('uninstall(卸载).bat', queue);
+    };
+
+    Nssm.prototype.buildRestartBat = function() {
+      var queue;
+      queue = ["" + this.nssmLocation + " restart " + this.service.name];
+      return this.writeBat('restart(重启).bat', queue);
+    };
+
+    Nssm.prototype.buildStartBat = function() {
+      var queue;
+      queue = ["" + this.nssmLocation + " start " + this.service.name];
+      return this.writeBat('start(启动).bat', queue);
+    };
+
+    Nssm.prototype.buildStopBat = function() {
+      var queue;
+      queue = ["" + this.nssmLocation + " stop " + this.service.name];
+      return this.writeBat('close(关闭).bat', queue);
+    };
+
+    Nssm.prototype.writeBat = function(fileName, msgArr) {
+      var index, value, _i, _len;
+      for (index = _i = 0, _len = msgArr.length; _i < _len; index = ++_i) {
+        value = msgArr[index];
+        value = value.replace(/\\/g, "\\\\") + "\n";
+        if (index === 0) {
+          $fs.writeFileSync(fileName, value);
+        } else {
+          $fs.appendFileSync(fileName, value);
         }
-        return cb && cb(err || stderr);
-      });
-    };
-
-    Nssm.prototype.baseStep = function() {
-      var self;
-      self = this;
-      return [
-        function(next) {
-          var error;
-          error = null;
-          if (!self.checkIsWindowPlatForm()) {
-            error = "only work in windows OS";
-          }
-          return next(error);
-        }, function(next) {
-          return $exec('NET SESSION', function(err, stdout, stderror) {
-            if (err || (stderror.length !== 0)) {
-              return next("No rights to manage services.");
-            } else {
-              return next();
-            }
-          });
-        }
-      ];
-    };
-
-    Nssm.prototype.install = function(cb) {
-      var command, main, queue, self, serviceName;
-      serviceName = this.option.name || this.appPackage.name;
-      console.log("serviceName", serviceName);
-      main = this.option.main || this.appPackage.main || '';
-      main = $path.join(process.cwd(), main);
-      if (this.option.arg) {
-        main = "" + main + " " + this.option.arg;
       }
-      command = "" + this.execLocation + " " + main;
-      console.log("command", command);
-      self = this;
-      queue = this.baseStep();
-      queue.push(function(next) {
-        return self.nssmExec("install", serviceName, command, function(err) {
-          return next(err);
-        });
-      });
-      queue.push(function(next) {
-        return self.nssmExec('start', serviceName, '', function(err) {
-          return next(err);
-        });
-      });
-      return $async.series(queue, function(err) {
-        return cb(err);
-      });
+      return $fs.appendFileSync(fileName, "pause");
     };
-
-    Nssm.prototype.uninstall = function(cb) {};
-
-    Nssm.prototype.start = function(serviceName, cb) {};
-
-    Nssm.prototype.stop = function(serviceName, cb) {};
 
     return Nssm;
 

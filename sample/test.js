@@ -1,10 +1,8 @@
 (function() {
-  var Winser, ser;
+  var Winser;
 
   Winser = require('../index');
 
-  ser = new Winser();
-
-  ser.install();
+  new Winser();
 
 }).call(this);

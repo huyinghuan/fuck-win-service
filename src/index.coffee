@@ -1,9 +1,6 @@
-$async = require 'async'
 $path = require 'path'
-$exec = require('child_process').exec
 $fs = require 'fs'
 ###
-
   option    [optional]
     name: "Service Name"
     exec: "Absolute Path to exec" #最好是绝对路径
@@ -17,6 +14,8 @@ class Nssm
     @initNssmLocation()
     @initAppPackage()
     @initExecLocation()
+    @initService()
+    @buildInstallBat()
 
   initAppPackage: ->
     packageJsonPath = $path.join process.cwd(), 'package.json'
@@ -26,95 +25,73 @@ class Nssm
   initNssmLocation: ->
     nssmExec = if @checkArch("32") then "nssm.exe" else "nssm64.exe"
     @nssmLocation = $path.join __dirname, 'bin', nssmExec
-    console.log @nssmLocation
+
 
   initExecLocation: ()->
     return @execLocation = @option.exec if @option.exec
     nodeExce = if @checkArch("32") then "node.exe" else "node64.exe"
     defExecLocation = $path.join process.cwd(), nodeExce
     @execLocation = defExecLocation
-    console.log @execLocation
+
+  initService: ()->
+    @service = {}
+    @service.name = @option.name or  @appPackage.name or 'node'
+
+    main = @option.main or @appPackage.main or ''
+    main = $path.join process.cwd(), main
+    main =  "#{main} #{@option.arg}" if @option.arg
+    @service.command = "#{@execLocation} #{main}"
+
 
   checkArch: (arch)->
     systemArch = process.arch.match(/(32|64)/)[1]
     systemArch is arch
 
-  checkIsWindowPlatForm: ->
-    return false if process.platform isnt 'win32'
-    return true
+  buildInstallBat: ->
+    #生成卸载等bat文件
+    @buildUninstallBat()
+    @buildRestartBat()
+    @buildStartBat()
+    @buildStopBat()
 
-  # nssm install serviceName  command
-  nssmExec: (operate, serviceName, command, cb) ->
-    self = @
-    cmd = "#{@nssmLocation} #{operate} #{command}"
-    $exec cmd, (err, stdout, stderr) ->
-      if stderr
-        not self.option.silent and console.error(stderr)
-      cb and cb(err or stderr)
-
-  baseStep: ()->
-    self = @
-    [
-      (next)->
-        error = null
-        if not self.checkIsWindowPlatForm()
-          error = "only work in windows OS"
-        next(error)
-    ,(next)->
-      $exec('NET SESSION', (err, stdout, stderror)->
-        if err or (stderror.length isnt 0)
-          next("No rights to manage services.")
-        else
-          next()
-      )
+    queue = [
+      "#{@nssmLocation} install #{@service.name} #{@service.command}" #注册服务命令
+      "#{@nssmLocation} start #{@service.name}"
     ]
+    @writeBat('register.bat', queue)
 
+  buildUninstallBat: ->
+    queue = [
+      "#{@nssmLocation} stop #{@service.name}"
+      "#{@nssmLocation} remove #{@service.name}"
+    ]
+    @writeBat('uninstall(卸载).bat', queue)
 
-  install: (cb)->
+  buildRestartBat: ->
+    queue = [
+      "#{@nssmLocation} restart #{@service.name}"
+    ]
+    @writeBat('restart(重启).bat', queue)
 
-    serviceName = @option.name or  @appPackage.name
+  buildStartBat: ->
+    queue = [
+      "#{@nssmLocation} start #{@service.name}"
+    ]
+    @writeBat('start(启动).bat', queue)
 
-    console.log "serviceName", serviceName
+  buildStopBat: ->
+    queue = [
+      "#{@nssmLocation} stop #{@service.name}"
+    ]
+    @writeBat('close(关闭).bat', queue)
 
-    main = @option.main or @appPackage.main or ''
-
-    main = $path.join process.cwd(), main
-
-    main =  "#{main} #{@option.arg}" if @option.arg
-
-    command = "#{@execLocation} #{main}"
-
-    console.log "command", command
-
-    self = @
-
-    queue = @baseStep()
-
-    #$async.series(queue, (err)-> cb and cb(err))
-    #return
-
-    queue.push((next)->
-      self.nssmExec("install", serviceName, command, (err)->
-        next err
-      )
-    )
-
-    queue.push((next)->
-      self.nssmExec('start', serviceName, '', (err)->
-        next err
-      )
-    )
-
-    $async.series(queue, (err)->
-      cb(err)
-    )
-
-  uninstall: (cb)->
-
-  start: (serviceName, cb)->
-
-  stop: (serviceName, cb)->
-
-
+  writeBat: (fileName, msgArr)->
+    for value, index in msgArr
+      value = value.replace(/\\/g, "\\\\") + "\n"
+      if index is 0
+        $fs.writeFileSync fileName, value
+      else
+        $fs.appendFileSync fileName, value
+    $fs.appendFileSync fileName, "pause"
 
 module.exports = Nssm
