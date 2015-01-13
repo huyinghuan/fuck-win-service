@@ -12,14 +12,14 @@ Note!!! Only work in windows. Don't support linux , mac os.
 
 
 ```
-npm install fuck-window-service --save
+npm install fuck-win-service --save
 ```
 
 ## Getting start
 1. 假设现在你已经完成了一个工程了。 只差部署了。那么可能可以按下面步骤操作
 在应用目录下面：
 ```
-npm install fuck-window-service --save
+npm install fuck-win-service --save
 ```
 
 2. 将node.exe(32位系统的)可执行文件（64位系统请更改名字为node64.exe）
@@ -29,7 +29,7 @@ npm install fuck-window-service --save
 3.  然后在应用个目录下 新建一个js文件，命名随意，这里 叫 register.js
 内容如下：
 ```
-winser = require(fuck-window-service)
+winser = require('fuck-wind-service')
 new winser()
 ```
 
