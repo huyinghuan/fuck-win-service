@@ -29,7 +29,7 @@ npm install fuck-win-service --save
 3.  然后在应用个目录下 新建一个js文件，命名随意，这里 叫 register.js
 内容如下：
 ```
-winser = require('fuck-wind-service')
+winser = require('fuck-win-service')
 new winser()
 ```
 
